@@ -1,0 +1,373 @@
+---
+title: "R code and report"
+author: "B212091 CHANGE TO YOUR EXAM NUMBER"
+date: "`r Sys.Date()`"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Task 1: R 
+
+In this task you are asked to investigate the data in `scot_unintentional_injuries.csv` and `healthboards.csv`. 
+
+The Unintentional Injuries dataset from Public Health Scotland provides information on emergency hospital admissions as a result of unintentional injuries and assaults. You can find more [information abou t the unintentional injuries data set here, including a data dictionary](https://www.opendata.nhs.scot/dataset/unintentional-injuries/resource/aee43295-2a13-48f6-bf05-92769ca7c6cf) and [here for more information about the health boards dataset](https://www.opendata.nhs.scot/dataset/geography-codes-and-labels/resource/652ff726-e676-4a20-abda-435b98dd7bdc). Do not import the data via the URL, you must use the data files provided for this assignment. 
+
+Follow the steps below to ultimately answer the final questions with the data. 
+
+* load the necessary libraries and packages
+* read in the data
+* join the two data sets together
+* check the data types of the variables of interest and ensure they are they type you want them to be. If not, change them.
+* check for the content/information contained within your variables of interest and ensure you are satisfied
+with the presentation
+* check for and deal with any missing data, if deemed appropriate
+* check the data formats (wide vs long) and transform if it is not appropriate
+
+*Question:* **Across Scotland, what are the most and least common unintentional injuries for young people aged 5-14 in 2013/14 and 2022/23 to be admitted to the emergency hospital for? Did the rate of these injuries change between time periods?**
+
+```{r}
+#1. Setup and Loading Necessary Libraries
+install.packages("dplyr")
+install.packages("tidyr")
+install.packages("tibble")
+install.packages("lubridate")
+install.packages("knitr")
+library(knitr)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(lubridate)
+# Set your working directory to where the CSV file is located (if necessary)
+#2. Setting Working Directory
+setwd("C:\\Users\\XNOTE\\Downloads")
+#3. Reading Data from CSV Files
+file_path_1 <- "C:/Users/XNOTE/Downloads/hb14_hb19.csv"
+file_path_2 <- "C:/Users/XNOTE/Downloads/ui_admissions_2023.csv"
+
+# Read the CSV file into a data frame
+health_boards_dataset <- read.csv(file_path_1)
+ui_admissions_2023 <- read.csv(file_path_2)
+
+#4. Initial Data Inspection
+# View the first few rows of the data to ensure it was imported correctly
+head(health_boards_dataset)
+head(ui_admissions_2023)
+
+#5. Handling Missing Data
+# Find the maximum value in the HBDateArchived column, ignoring NA values
+max_value <- max(health_boards_dataset$HBDateArchived, na.rm = TRUE)
+
+# Fill NA values with the maximum value
+health_boards_dataset <- health_boards_dataset %>%
+  mutate(HBDateArchived = ifelse(is.na(HBDateArchived), max_value, HBDateArchived))
+
+# Display the updated data frame
+glimpse(health_boards_dataset)
+
+
+# For an overview ui_admissions_2023
+glimpse(ui_admissions_2023)
+#6. Renaming Columns
+colnames(ui_admissions_2023)[which(names(ui_admissions_2023) == "HBR")] <- "HB"
+
+#7. Merging Datasets
+# Perform the left join on the HB column.
+ui_health_boards = left_join(ui_admissions_2023, health_boards_dataset, by='HB')
+  
+# Overview the resulting data frame
+head(ui_health_boards)
+
+# For an overview ui_health_boards
+glimpse(ui_health_boards)
+
+# Extract unique values from the specified columns
+HB_unique_values <- unique(ui_health_boards$HB)
+
+# Print the unique values
+print(HB_unique_values)
+
+#8. Handling Missing Values Post-Merge
+# The unique values,S92000003 makes NA when two dataframes are left joined.
+# Missing data will be replaced.
+ui_health_boards <- ui_health_boards %>%
+  mutate(
+    HBName = replace_na(HBName, 'Unknown'),
+    Country = replace_na(Country, 'S92000003')
+  )
+
+#9. Date Conversion
+# Convert date columns from 'YYYYMMDD' format to Date objects
+ui_health_boards <- ui_health_boards %>%
+  mutate(
+    HBDateEnacted = ymd(HBDateEnacted),
+    HBDateArchived = ymd(HBDateArchived)
+  )
+
+# Replace NA values with NA Date
+ui_health_boards <- ui_health_boards %>%
+  mutate(
+    HBDateEnacted = replace_na(HBDateEnacted, as.Date(NA)),
+    HBDateArchived = replace_na(HBDateArchived, as.Date(NA))
+  )
+
+#10. Identifying and Handling Missing Values
+# find location of missing values
+print("Position of missing values ")
+colSums(is.na(ui_health_boards))
+
+HBRQF_unique <- unique(ui_health_boards$HBRQF)
+print(HBRQF_unique)
+
+cols_to_replace <- c('HBRQF', 'CAQF', 'AgeGroupQF', 'SexQF', 'InjuryLocationQF', 'InjuryTypeQF')
+replacement_value <- 'b'
+
+# Replace empty strings with the specified value
+ui_health_boards <- ui_health_boards %>%
+  mutate(
+    across(all_of(cols_to_replace), ~if_else(. == "", replacement_value, .))
+  )
+#11. Filtering Data by Age Group and Financial Year
+# For an overview ui_health_boards
+glimpse(ui_health_boards)
+
+ui_admissions_2023_age <- ui_admissions_2023[ui_admissions_2023$AgeGroup == '5-14 years', ]
+
+ui_admissions_2023_age <- ui_admissions_2023 %>% filter(AgeGroup %in% c('5-9 years', '10-14 years'))
+head(ui_admissions_2023_age)
+
+ui_admissions_2023_age_201314 <- ui_admissions_2023_age %>% filter(FinancialYear == '2013/14')
+head(ui_admissions_2023_age_201314)
+
+ui_admissions_2023_age_202223 <- ui_admissions_2023_age %>% filter(FinancialYear == '2022/23')
+head(ui_admissions_2023_age_202223)
+
+
+#12. Summarizing Admissions by Injury Type
+# NumberOfAdmissions sum
+grouped_ui_admissions_2023_age_201314 <- ui_admissions_2023_age_201314 %>%   group_by(InjuryType) %>% summarize(injury_type_count = sum(NumberOfAdmissions))
+grouped_ui_admissions_2023_age_201314 <- grouped_ui_admissions_2023_age_201314 %>%
+  arrange(desc(injury_type_count))
+print(grouped_ui_admissions_2023_age_201314)
+
+grouped_ui_admissions_2023_age_202223 <- ui_admissions_2023_age_202223 %>%   group_by(InjuryType) %>% summarize(injury_type_count = sum(NumberOfAdmissions))
+grouped_ui_admissions_2023_age_202223 <- grouped_ui_admissions_2023_age_202223 %>%
+  arrange(desc(injury_type_count))
+print(grouped_ui_admissions_2023_age_202223)
+#Both 2013/14 and 2022/23 are same as most is Falls and least is Scalds.
+
+#6. Falls	/ Scalds rate compare according to time period.
+#calculating total number of admission in each year?
+ui_admissions_2023_age_total_NumberOfAdmissions <- ui_admissions_2023_age %>%   group_by(FinancialYear) %>% summarize(Total_NumberOfAdmissions = sum(NumberOfAdmissions))
+glimpse(ui_admissions_2023_age_total_NumberOfAdmissions)
+
+#13. Comparing Admission Rates Over Time
+#Sorting injury type is falls and scalds
+ui_admissions_2023_age_Falls <- ui_admissions_2023_age[ui_admissions_2023$InjuryType == 'Falls', ]
+ui_admissions_2023_age_Falls_year <- ui_admissions_2023_age_Falls %>%   group_by(FinancialYear) %>% summarize(Fall_NumberOfAdmissions = sum(NumberOfAdmissions))
+glimpse(ui_admissions_2023_age_Falls_year)
+ui_admissions_2023_age_Scalds <- ui_admissions_2023_age[ui_admissions_2023$InjuryType == 'Scalds', ]
+ui_admissions_2023_age_Scalds_year <- ui_admissions_2023_age_Scalds %>%   group_by(FinancialYear) %>% summarize(Fall_NumberOfAdmissions = sum(NumberOfAdmissions))
+glimpse(ui_admissions_2023_age_Scalds_year)
+
+#Sum number of admission of falls and scalds
+merged_df_Falls_year <- merge(ui_admissions_2023_age_Falls_year, ui_admissions_2023_age_total_NumberOfAdmissions, by = "FinancialYear", all.x = TRUE)
+glimpse(merged_df_Falls_year)
+merged_df_Scalds_year <- merge(ui_admissions_2023_age_Scalds_year, ui_admissions_2023_age_total_NumberOfAdmissions, by = "FinancialYear", all.x = TRUE)
+glimpse(merged_df_Falls_year)
+glimpse(merged_df_Scalds_year)
+
+#Calculating rate according to the time period
+# Calculate the rate for each injury type
+merged_df_Falls_year$Admissions_Ratio <- merged_df_Falls_year$Fall_NumberOfAdmissions / merged_df_Falls_year$Total_NumberOfAdmissions
+# Overview the updated data frame
+glimpse(merged_df_Falls_year)
+
+# Calculate the rate for each injury type
+merged_df_Scalds_year$Admissions_Ratio <- merged_df_Scalds_year$Fall_NumberOfAdmissions / merged_df_Scalds_year$Total_NumberOfAdmissions
+# Overview the updated data frame
+glimpse(merged_df_Scalds_year)
+
+
+#Admissions Ratio of Falls has been changed from 0.22 to 0.26 throughout the year. In 2022/23, ratio is the lowest.
+#Admissions Ratio of Scalds has been fluctuated from 0.003 to 0.007 throughout the year. In 2022/23, ratio is the highest.
+
+```
+
+```{r}
+
+
+```
+
+```{r}
+
+```
+
+**Task 1 (R) Answer** (in 1-2 sentences): 
+
+
+## Task 1 Report
+
+* word limit: 1100 words maximum including Task 2 report  
+* word count: **add here once you have completed this section**
+* Discuss your approach to solving this task in both languages (what you did and why you did it this way) and how your approach was similar or different between Python and R. 
+
+Python :
+  The Pandas library is imported to handle data manipulation and analysis. The health_boards_dataset and ui_admissions_2023 data frames are created by reading data from CSV files. This displays summary information about the health_boards_dataset, such as the number of entries, column names, data types, and non-null values.
+  The maximum value in the HBDateArchived column is found and used to fill any NaN values, assuming that records are more likely to be archived recently. The data types of each column in health_boards_dataset are printed for verification. The unique_values in the HBRQF column is checked to filter certain column. NaN values in specified columns are filled with 'b' to indicate blanks. The data types of columns in ui_admissions_2023 are printed for verification. The ui_admissions_2023 and health_boards_dataset DataFrames are merged on the HBR and HB columns. The merged DataFrame ui_health_boards is displayed along with its summary information. 
+  Checking the missing data in each column and changing the missing data according to the feature of each column is needed. For example, HBDateArchived and HBDateEnacted column should be coded NaT according to data type. Missing values in HBName and Country are filled with 'Unknown' and 'S92000003', respectively.
+The HBDateEnacted and HBDateArchived columns are converted to datetime objects. NaT is used to fill any remaining NaN values in the date columns. Data for age groups '65-74 years' and '75plus years' is filtered into ui_admissions_2023_age_over65.
+A new column Injury_Type_Count_Sum is added, containing the sum of admissions for each injury type.
+The DataFrame is sorted by Injury_Type_Count_Sum in descending order. Injury types are grouped, and the number of admissions is summed.
+  The top 5 injury types by admission count are printed. Data for NHS Lothian (S08000024) and NHS Greater Glasgow and Clyde (S08000031) is filtered. Top 5 injury types are identified and printed for each health board. This code performs extensive data preprocessing and analysis, including handling missing values, merging datasets, filtering data based on specific criteria, and summarizing key findings such as the most common injury types for certain age groups and health boards.
+
+R : 
+  First, the required R packages are installed and loaded. These packages include dplyr, tidyr, tibble, and lubridate, which provide functions for data manipulation and date handling. The working directory is set to the location where the CSV files are stored. This step ensures that the files can be accessed without providing full paths.
+  Two datasets are read from CSV files into R data frames. The first few rows of the datasets are viewed to ensure they were imported correctly by using head function. The maximum value in the HBDateArchived column is found and used to replace NA values in this column. The HBR column in ui_admissions_2023 is renamed to HB to facilitate joining. The two datasets are merged using a left join on the HB column. Missing values in specific columns are replaced with default values. Date columns are converted from 'YYYYMMDD' format to Date objects. Positions of missing values are identified, and empty strings in specified columns are replaced with a other values according to the data type. Data is filtered to include only certain age groups and financial years for analysis. 
+  The number of admissions is summarized by injury type for each financial year. The total number of admissions is calculated for each year, and the rate of admissions for specific injury types (Falls and Scalds) is calculated and compared. This explanation outlines the steps taken in the code to handle data preparation, cleaning, transformation, and analysis. The approach includes dealing with missing data, ensuring proper data types and formats, merging datasets, and performing specific analyses to summarize and compare data points over different time periods.
+
+Similarity : 
+  The flow of analyzing data is similar. For the column named HBDateEnacted and HBDateArchived, NA value in python and Empty value in R is remained NA because the NA occurs to left join the 'S92000003' which does not actually indicate the region but is from the column named 'CA'.
+  In both R and Python, the variables of interest are Age Group, Financial Year, Number Of Admissions and Injury Type. Age Group and Financial Year is not appropriate because it is hard to use inequality sign to filter over certain number. It is better to be changed in integer as Group_min_age and Group_max_age to sort it easily. 
+  Long Format is appropriate for both R and Python. Long Format gives flexibility, ease of analysis and compatibility with data analysis tools. The long format is more flexible for handling a large number of variables and observations. It is especially useful when working with time series data or categorical data, such as your FinancialYear, HB, AgeGroup, Sex, InjuryLocation, InjuryType, etc. Analytical operations such as filtering, grouping, and aggregation are generally more straightforward in long format. For example, analyzing the number of admissions by year, health board, or injury type can be efficiently performed. Many data analysis in Python, such as Pandas are optimized for long format data. However, wide format makes lots of column and hard to sort the data.
+
+Difference : 
+  Vacant Data in column named 'HBRQF', 'CAQF', 'AgeGroupQF', 'SexQF', 'InjuryLocationQF', 'InjuryTypeQF' are NA in python but they are not NA but blank in R.
+Python can be operated with pandas to adopt pd.NaT but R can operate with installed function such as as.Date(NA).
+Python has the function called info which shows the data briefly but R has the glimpse function with installing the package.
+In python, HBR is considered to count the number of admissions according to regions.
+
+
+
+
+## Task 1 other data types or data structures 
+
+* word limit: 150 words maximum 
+* word count: **add here once you have completed this section**
+* Discuss 2 other data types or data structures (2 total) that you could have used in solving this task and why they would or would not be suitable. 
+
+For column named HBDateEnacted and HBDateArchived, Date type has been adopted because character is not adequate for filtering by time. Following the change, NA is also changed to NA.T. NA is filled with 'sting'. The Data structures are changed because the join key for ['HB'] is overlapped. One of Join key was erased and two data sets are joined.
+
+
+
+
+# Task 2: R  
+
+There has been an IT failure in the prescribing databases in a local area. The only remaining data around medications is the backup file below, but it has been scrambled. Explore the following data object `x`. Select **7 of the 10** aspects of data and reconstruct the dataset about medications. Present `x` in a more clear and better structured format, ensuring that the data structure and data types are appropriate, given the (limited) information provided.
+
+The code to load data object `x` has been provided below. 
+
+```{r task2-data}
+install.packages("rjson",repos="https://cran.us.r-project.org")
+library(rjson)
+
+setwd("C:\\Users\\XNOTE\\Downloads")
+file_path_3 <- "C:/Users/XNOTE/Downloads/task2_data.json"
+x <- fromJSON(file= file_path_3)
+print(x)
+
+# Convert data to a matrix
+matrix_data <- matrix(unlist(x), ncol = 25, byrow = TRUE)
+
+# Print the matrix
+print(matrix_data)
+
+# Naming rows
+rownames(matrix_data) = c('Color', 'Shape', 'Code', 'Dosage', 'Unit', 'Times per day', 'Binary', 'Year', 'Date', 'Category')
+
+# transpose the data
+matrix_data_transpose <- t(matrix_data)
+matrix_data_transpose
+
+
+# Drop columns by name
+matrix_data_transpose <- matrix_data_transpose[, !(colnames(matrix_data_transpose) %in% c("Binary", "Year", "Date"))]
+matrix_data_transpose
+# Print all the combination and frequency
+df <- as.data.frame(matrix_data_transpose)
+
+# Combine Color and Shape columns to create a new column
+df$Color_Shape <- paste(df$Color, df$Shape, sep = " ")
+
+# Count the frequency of each combination of Color and Shape
+combined_frequency <- table(df$Color_Shape)
+
+# Display the result
+combined_frequency
+
+
+# Apply the aggregate function to each column
+grouped_data <- lapply(df, function(x) {aggregate(x, by = list(x), FUN = function(x) {x})})
+
+# Display the result
+grouped_data
+
+# After manual operation csv file is imported
+setwd("C:\\Users\\XNOTE\\Documents")
+Final <- read.csv('C:\\Users\\XNOTE\\Documents\\drug_data_Sheet1.csv')
+print(Final)
+
+#Concatenated data contains unique information to identify the drug.
+Final$concatenated <- paste(Final$Code, Final$Dosage, Final$Unit, Final$Color, Final$Shape, sep = " ")
+print(Final)
+```
+
+```{r}
+
+```
+
+
+```{r}
+
+
+
+
+```
+
+
+## Task 2 report 
+
+* word limit: 1100 words maximum including Task 1 report  
+* word count: **add here once you have completed this section**
+* Discuss your approach to solving this task (what you did and why you did it this way) and how your approach was similar or different between Python and R. 
+Python:
+I start by examining the overall structure of the data to ensure consistency and completeness. I proceed to convert the data into a DataFrame and transpose it.
+A key operation in this script is the concatenation of dosage and mark values to create unique identifiers. By combining these two pieces of information, I ensure that each entry in the DataFrame can be distinctly identified. Additional data is then composed to mark these unique values.
+
+R:
+In the R script, the initial step involves converting the data into a matrix format. This transformation is essential for leveraging R’s matrix operations, which are optimized for handling data in this structure.
+
+Similarity :
+ Assigning appropriate names to columns and rows improves the clarity and interpretability of the data, making subsequent analysis more straightforward.
+I also consider the significance of odd and even numbers within the dataset, as they play an important role in our analysis. The primary objective is to identify and mark unique combinations of data points, with a focus on maintaining a low combination count. 
+
+Difference:
+Function, Summarising and matching the value is different.
+
+
+
+
+## Task 2 other data types or data structures
+
+* word limit: 150 words maximum 
+* word count: **add here once you have completed this section**
+* Discuss 2 other data types or data structures (2 total) that you could have used in solving this task and why they would or would not be suitable. 
+
+Both Python and R, the data is transposed and the character and dosage column are joined to be matched with unique color and shape. Year, Flag and Other date columns are removed because it disturbs the matching.
+
+# Reflective account 
+
+* word limit: 300 word maximum 
+* word count: **add here once you have completed this section**
+* Provide a brief reflective account on your learning journey throughout the course. Reflect on the skills you have developed, and areas that you have noticed that may need further development. The 3 stars and a wish mini-diaries you have been completing across the course can be super useful to you here.
+
+Python and R have different system for data approach. In Python, the datetime module is the primary library used for date and time manipulation. It provides a variety of classes, including datetime, date, time, and timedelta, which allow for precise and flexible date and time handling. In R, the lubridate package enhances date manipulation by providing more intuitive functions.Python’s data structures such as list, dictionary, numpy and dataframe are primarily provided by built-in types and the pandas library. R is good for its data structures designed specifically for statistical analysis.
+
+
+
+
+
