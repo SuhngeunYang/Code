@@ -1,0 +1,261 @@
+---
+title: "Individual report"
+author: "Suhngeun Yang"
+date: '2024-02-19'
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(root.dir = "C:\\Users\\XNOTE\\Downloads", echo = TRUE)
+#install.packages("dplyr")
+#install.packages("magrittr")
+#install.packages("ggplot2")
+#install.packages("car")
+library(dplyr)
+library(magrittr)
+library(ggplot2)
+library(car)
+
+setwd("C:\\Users\\XNOTE\\Downloads")
+# Read the CSV file from the specified directory
+data <- read.csv("carehomedata_assessment2024.csv")
+str(data)
+summary(data)
+
+```
+
+The number of categorical variable is almost same in each groups.
+When we analyze the VIF, “age at recording”, "moderate_activity" and "BMI" have little multicollinearity which means a low correlation of that predictor with other predictors.
+"moderate_activity" and "BMI" have higher VIF values (1.463732 and 1.477908, respectively), indicating low level of multicollinearity.
+
+
+```{Question1, include=FALSE}
+boxplot(age_at_death ~ sex, data = data)
+summary(data$sex)
+
+
+# Assuming your data frame is named 'df'
+# Replace 'df' with the name of your data frame if different
+
+# Count the number of occurrences for 'sex'
+sex_counts <- table(data$sex)
+print(sex_counts)
+
+# Count the number of occurrences for 'physical_activity'
+physical_activity_counts <- table(data$physical_activity)
+print(physical_activity_counts)
+
+# Count the number of occurrences for 'carehome_id'
+carehome_id_counts <- table(data$carehome_id)
+print(carehome_id_counts)
+
+# Assuming you have a linear regression model named 'lm_model'
+# Replace 'lm_model' with the name of your model
+
+lm_model_age_at_death <- lm(age_at_death ~ sex+age_at_recording+physical_activity+moderate_activity+BMI+carehome_id, data = data)
+
+lm_model_age_at_death <- lm(age_at_death ~ age_at_recording+moderate_activity+BMI, data = data)
+summary(lm_model_age_at_death)
+
+# Calculate VIF
+vif_values <- vif(lm_model_age_at_death)
+ vif(lm_model_age_at_death)
+# Print the VIF values
+print(vif_values)
+
+```
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+There is no relationship between physical_activity and carehome_id.
+There is no difference in moderate_activity according to carehome_id.
+The reason why I used Welch Two Sample t-test is the variation of each sample who has different carehome_id.
+
+There is non-parametric variables such as participant_id, sex, physical_activity, and carehome_id and others are parametric.
+According to the analysis, there is a significant difference in age at death according to the physical activity.
+More specifically, changing physical activity from low to light, the age of death changed significantly.
+For specify intervention, it is better to match the moderate_activity and BMI because physical_activity is related to moderate_activity and BMI which have multicollinearity.
+The P-value of correlation between moderate_activity and physical_activity is 0.03673.
+The P-value of correlation between BMI and physical_activity is 0.01946.
+As a result, alternative hypothesis that true correlation is not equal to 0 is selected.
+If we need intervention, how to boost people who has low physical activity to light physical activity.
+
+
+
+
+```{Question2}
+#2
+#care home(categorical), the type of physical activity(categorical)
+
+#chisq.test Example:
+chisq.test(table(data$physical_activity, data$carehome_id))
+
+#care home(categorical), longer amount of moderate activity(numeric)
+data$moderate_activity <- factor(data$moderate_activity)
+ggplot(data, aes(x = moderate_activity, fill = carehome_id)) +
+  geom_bar(position = "fill")
+
+# Assuming 'data' is your data frame with percentage and categorical variables
+ggplot(data, aes(x = factor(carehome_id), y = moderate_activity, group = factor(carehome_id))) +
+  geom_boxplot(fill = "skyblue", color = "black") +
+  labs(x = "carehome_id", y = "moderate_activity") +
+  theme_minimal()
+
+# Assuming 'data' is your data frame with percentage and categorical variables
+library(dplyr)
+library(ggplot2)
+
+# Filter out rows with missing moderate_activity
+data_filtered <- data %>%
+  filter(!is.na(moderate_activity))
+
+# Create the plot with filtered data
+ggplot(data_filtered, aes(x = carehome_id, y = moderate_activity)) +
+  geom_violin(fill = "skyblue", color = "black") +
+  labs(x = "carehome_id", y = "moderate_activity") +
+  theme_minimal()
+
+
+# Assuming your data frame is named 'data'
+moderate_activity_carehome_1 <- data$moderate_activity[data$carehome_id == 1]
+moderate_activity_carehome_2 <- data$moderate_activity[data$carehome_id == 2]
+# Example (Q-Q Plot):
+qqnorm(moderate_activity_carehome_1)
+qqline(moderate_activity_carehome_1)
+
+qqnorm(moderate_activity_carehome_2)
+qqline(moderate_activity_carehome_2)
+
+# Calculate sample variance
+variance_moderate_activity_carehome_1 <- var(moderate_activity_carehome_1)
+print(variance_moderate_activity_carehome_1)
+variance_moderate_activity_carehome_2 <- var(moderate_activity_carehome_2)
+print(variance_moderate_activity_carehome_2)
+
+# Example
+t.test(moderate_activity ~ carehome_id, data = subset(data, carehome_id %in% c("1", "2")))
+
+
+```
+#3
+
+There are 4 assumptions for anova are met. Random sampling and independence are met because there is no duplicated patient id. Homogeneity of variances are met because the variance of residuals are similar according to fitted values. Also, Normality is met because almost data is on the QQ line.
+Also, age at death is related to age_at_recording, moderate_activity and BMI. The relation Moderate_activity and BMI with is physical_activity investigated further. After Anova, Moderate_activity is not significantly different according to physical_activity. BMI is different according to physical_activity. Especially, BMI is significantly different when physical activity is moderate and low according to Post hoc test. It is better to set BMI as intervention to analyze physical_activity and age at death.
+
+
+
+```{Question3, echo=FALSE}
+#3
+#age_at_death & physical_activity
+str(data$physical_activity)
+# Example (boxplot):
+boxplot(age_at_death ~ physical_activity, data = data)
+# Example:
+anova_model <- aov(age_at_death ~ physical_activity, data = data)
+summary(anova_model)
+plot(anova_model)
+
+
+# Example (Tukey's HSD test):
+#sitting, low, light, moderate.
+TukeyHSD(anova_model)
+
+
+#Intervention
+#cor.test(data$physical_activity, data$moderate activity)
+
+# Create a numeric mapping for the categories in physical_activity
+# For example, you might assign "low" as 1, "light" as 2, etc.
+#ANOVA!
+
+
+ggplot(data, aes(x = factor(physical_activity), y = moderate_activity, group = factor(physical_activity))) +
+  geom_boxplot(fill = "skyblue", color = "black") +
+  labs(x = "physical_activity", y = "moderate_activity") +
+  theme_minimal()
+#anova with physical_activity and moderate_activity
+anova_model_p_m <- aov(moderate_activity ~ physical_activity, data = data)
+summary(anova_model_p_m)
+plot(anova_model_p_m)
+
+ggplot(data, aes(x = factor(physical_activity), y = BMI, group = factor(physical_activity))) +
+  geom_boxplot(fill = "skyblue", color = "black") +
+  labs(x = "physical_activity", y = "BMI") +
+  theme_minimal()
+#anova with physical_activity and bmi
+anova_model_p_B <- aov(BMI ~ physical_activity, data = data)
+summary(anova_model_p_B)
+plot(anova_model_p_B)
+
+TukeyHSD(anova_model_p_B)
+```
+## Including Plots
+BMI and moderate activity is checked as normal distribution to do linear regression.
+There is a relationship between BMI and moderate activity according to linear regression.
+However, moderate activity and bmi has some level of multicollinearity so it should be analyzed further.
+There is a limitation to use the linear regression because moderate activity has multicollinearity.
+Especially, both linear regression and BMI is related to physical_activity so it needs to be analyzed further to minimize the effect of physical activity.
+To use linear regression, the explanatory variables should not follow multicollinearity.
+The histogram of residuals are not clined to left or right. Also, almost the residuals are on QQ-line except lower than -2.5 quantiles or upper than 2.5 quantiles.
+To calculate correlation, the peason's product moment was selected because of the condition that n>=30, countinous and linear. The residuals are normally distributed according to the result of Kolmogorov-Smirnov’s normality test. There is a statistically significant negative correlation(cor = -0.555208) between BMI and moderate activity levels.
+
+```{Question4, echo=FALSE}
+plot(pressure)
+#4
+
+#BMI, moderate_activity normal distribution check to do parametric analysis
+qqnorm(data$BMI)
+qqline(data$BMI)
+qqnorm(data$moderate_activity)
+qqline(data$moderate_activity)
+
+
+# Scatter plot
+plot(data$moderate_activity, data$BMI,
+     xlab = "moderate_activity", ylab = "BMI", 
+     main = "Scatter Plot")
+
+#Fitted values and residuals
+
+# linear regression
+lm_model <- lm(BMI ~ moderate_activity, data = data)
+summary(lm_model)
+
+# Get the model residuals
+model_residuals = lm_model$residuals
+
+# Plot the result
+hist(model_residuals)
+
+# Plot the residuals
+qqnorm(model_residuals)
+
+# Plot the Q-Q line
+qqline(model_residuals).
+
+
+#Kolmogorov-Smirnov’s normality test
+ks_result <- ks.test(model_residuals, "pnorm")
+
+# Print the test result
+print(ks_result)
+
+
+# Perform Pearson correlation test
+cor_test_result <- cor.test(data$BMI, data$moderate_activity)
+
+# Print the test result
+print(cor_test_result)
+
+'''
+#t-test(Hypothesis testing), one sample t-test
+t.test(data$BMI, mu = 0, alternative = "two.sided")
+t.test(data$moderate_activity, mu = 0, alternative = "two.sided")
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
